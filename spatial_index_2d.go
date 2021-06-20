@@ -1,4 +1,4 @@
-package main
+package modularspatialindex
 
 import (
 	"encoding/binary"
