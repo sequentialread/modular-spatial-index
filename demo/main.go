@@ -1,4 +1,4 @@
-package main
+package demo
 
 import (
 	"encoding/binary"
@@ -7,7 +7,9 @@ import (
 	"image/color"
 	"math"
 	"time"
-	// OR: github.com/go-gl/gl/v2.1/gl
+
+	spatialIndex "git.sequentialread.com/forest/modular-spatial-index"
+	demo "git.sequentialread.com/forest/modular-spatial-index/demo"
 )
 
 const dim = 512
@@ -18,7 +20,7 @@ const saturationFluctuationCount = float64(8)
 var frames = 0
 
 func main() {
-	run_opengl_app(func() *image.RGBA {
+	demo.run_opengl_app(func() *image.RGBA {
 
 		seconds := float64(time.Now().UnixNano()) / float64(int64(time.Second))
 
@@ -28,8 +30,8 @@ func main() {
 		rectMaxX := rectX + rectSize
 		rectMaxY := rectY + rectSize
 
-		inputMin, inputMax := GetValidInputRange()
-		_, outputMaxBytes := GetOutputRange()
+		inputMin, inputMax := spatialIndex.GetValidInputRange()
+		_, outputMaxBytes := spatialIndex.GetOutputRange()
 		curveLength := int(binary.BigEndian.Uint64(outputMaxBytes))
 		//log.Printf("inputMin: %d, inputMax: %d, curveLength: %d", inputMin, inputMax, curveLength)
 
@@ -38,7 +40,7 @@ func main() {
 		remappedRectXMax := int(lerp(float64(inputMin), float64(inputMax), float64(rectX+rectSize)/float64(dim)))
 		remappedRectSize := remappedRectXMax - remappedRectXMin
 
-		byteRanges, err := RectangleToIndexedRanges(remappedRectXMin, remappedRectYMin, remappedRectSize, remappedRectSize, 1)
+		byteRanges, err := spatialIndex.RectangleToIndexedRanges(remappedRectXMin, remappedRectYMin, remappedRectSize, remappedRectSize, 1)
 		if err != nil {
 			panic(err)
 		}
@@ -90,7 +92,7 @@ func main() {
 					continue
 				}
 
-				curvePointBytes, err := GetIndexedPoint(remappedX, remappedY)
+				curvePointBytes, err := spatialIndex.GetIndexedPoint(remappedX, remappedY)
 				curvePoint := int(binary.BigEndian.Uint64(curvePointBytes))
 				if err != nil {
 					panic(err)

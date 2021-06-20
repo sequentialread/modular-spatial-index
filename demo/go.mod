@@ -1,4 +1,4 @@
-module git.sequentialread.com/forest/graffiti/hilbert_test
+module git.sequentialread.com/forest/modular-spatial-index/demo
 
 go 1.16
 
