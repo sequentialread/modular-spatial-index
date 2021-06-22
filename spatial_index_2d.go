@@ -88,7 +88,7 @@ type ByteRange struct {
 // iopsCostParam allows you to adjust a tradeoff between wasted I/O bandwidth and # of individual I/O operations.
 // I think 1.0 is actually a very reasonable value to use for SSD & HDD
 // (waste ~50% of bandwidth, save a lot of unneccessary I/O operations)
-// if you have an extremely fast NVME SSD with a good driver, you might try 0.5 or 0.1.
+// if you have an extremely fast NVME SSD with a good driver, you might try 0.5 or 0.1, but I doubt it will make it any faster.
 // 2 is probably way too much for any modern disk to benefit from, unless your data is VERY sparse
 func RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([]ByteRange, error) {
 
