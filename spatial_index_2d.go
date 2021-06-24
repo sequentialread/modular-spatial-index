@@ -23,6 +23,7 @@ func getHilbertPlaneEdgeSizeBitsForCurrentProcessor() int {
 }
 
 // returns the minimum and maximum values for x and y coordinates passed into the index.
+// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
 func GetValidInputRange() (int, int) {
 	halfHilbertEdgeLength := 1 << (getHilbertPlaneEdgeSizeBitsForCurrentProcessor() - 1)
 	return -halfHilbertEdgeLength + 1, halfHilbertEdgeLength - 1
@@ -30,6 +31,7 @@ func GetValidInputRange() (int, int) {
 
 // returns two byte slices of length 8, one representing the smallest key in the index
 // and the other representing the largest possible key in the index
+// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
 func GetOutputRange() ([]byte, []byte) {
 	min := make([]byte, 8)
 	binary.BigEndian.PutUint64(min, uint64(0))

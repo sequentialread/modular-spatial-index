@@ -25,10 +25,12 @@ Note that the hilbert curve has some rough edges around the center of the curve 
 
 ```
 // returns the minimum and maximum values for x and y coordinates passed into the index.
+// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
 func GetValidInputRange() (int, int) { ... }
 
 // returns two byte slices of length 8, one representing the smallest key in the index 
 // and the other representing the largest possible key in the index
+// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
 func GetOutputRange() ([]byte, []byte) { ... }
 
 // Returns a slice of 8 bytes which can be used as a key in a database index,
