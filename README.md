@@ -20,7 +20,7 @@ for more information.
 See [writing keys](https://git.sequentialread.com/forest/graffiti-app/src/commit/5cbac1a58a8afefbecebf9d1774275b7e25b122b/main.go#L503)
 and [querying an area](https://git.sequentialread.com/forest/graffiti-app/src/commit/5cbac1a58a8afefbecebf9d1774275b7e25b122b/main.go#L544).
 
-Note that the hilbert curve has some rough edges around the center of the curve plane at `[0,0]`, so you will hit worse-case performance (about 3x slower than best case) around there. In my app I [simply offset the universe a bit to avoid this](https://git.sequentialread.com/forest/graffiti-app/src/commit/49d90e3af461f2f07c45a6fda758f5bce55aac19/main.go#L95).
+Note regarding `sillyHilbertOptimizationOffset`: The hilbert curve has some rough edges around the center of the curve plane at `[0,0]`, so you will hit worse-case performance (about 3x slower than best case) around there. In my app I [simply offset the universe a bit to avoid this](https://git.sequentialread.com/forest/graffiti-app/src/commit/5cbac1a58a8afefbecebf9d1774275b7e25b122b/main.go#L102).
 
 If your database doesn't support arbitrary byte arrays as keys and values, you can simply convert the byte arrays to strings, as long as the sort order is preserved.
 
