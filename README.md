@@ -4,12 +4,13 @@
 
 For the demo that this animated gif was generated from, see: https://git.sequentialread.com/forest/modular-spatial-index-demo-opengl
 
+modular-spatial-index is a simple spatial index adapter for key/value databases like leveldb and Cassandra (or RDBMS like SQLite/Postgres if you want), based on https://github.com/google/hilbert.
 
-modular-spatial-index is a simple spatial index adapter for key/value databases (or RDBMS if you want), based on https://github.com/google/hilbert.
+It's called "modular" because it doesn't have any indexing logic inside, you bring your own index. It simply defines a mapping from two-dimensional space (`[x,y]` as integers) to 1-dimensional space (a single string of bytes for a point, or a handful of byte-ranges for a rectangle). You can use these strings of bytes (keys) and byte-ranges (query parameters) in any database to implement a spatial index.
 
-Read amplification for range queries is aproximately like 2x-3x in terms of IOPS and bandwidth compared to a 1-dimensional query.
+Read amplification for range queries is ~2x-3x in terms of IOPS and bandwidth compared to a 1-dimensional query.
 
-But that constant factor on top of your O(1) database is a low price to pay for a whole new dimension, right? It's certainly better than the naive approach.
+But that constant factor on top of your fast key/value database is a low price to pay for a whole new dimension, right? It's certainly better than the naive approach.
 
 See https://sequentialread.com/building-a-spatial-index-supporting-range-query-using-space-filling-hilbert-curve
 for more information.
@@ -20,6 +21,8 @@ See [writing keys](https://git.sequentialread.com/forest/graffiti-app/src/commit
 and [querying an area](https://git.sequentialread.com/forest/graffiti-app/src/commit/49d90e3af461f2f07c45a6fda758f5bce55aac19/main.go#L534).
 
 Note that the hilbert curve has some rough edges around the center of the curve plane at `[0,0]`, so you will hit worse-case performance (about 3x slower than best case) around there. In my app I [simply offset the universe a bit to avoid this](https://git.sequentialread.com/forest/graffiti-app/src/commit/49d90e3af461f2f07c45a6fda758f5bce55aac19/main.go#L95).
+
+If your database doesn't support arbitrary byte arrays as keys and values, you can simply convert the byte arrays to strings, as long as the sort order is preserved.
 
 ## Interface 
 
@@ -37,6 +40,8 @@ func GetOutputRange() ([]byte, []byte) { ... }
 // to be spatial-range-queried by RectangleToIndexedRanges
 func GetIndexedPoint(x int, y int) ([]byte, error) { ... }
 
+// inverse of GetIndexedPoint. Return [x,y] position from an 8-byte spatial index key
+func GetPositionFromIndexedPoint(indexedPoint []byte) (int, int, error) { ... }
 
 // Use this with a range query on a database index.
 type ByteRange struct {

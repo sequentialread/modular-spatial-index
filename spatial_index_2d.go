@@ -2,6 +2,7 @@ package modularspatialindex
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/bits"
 	"sort"
 )
@@ -55,7 +56,7 @@ func GetIndexedPoint(x int, y int) ([]byte, error) {
 	// so by adding (index.N >> 1) we are mapping from a -0.5..0.5 range to a 0..1 range.
 	// MapInverse will handle any out-of-bounds inputs & return ErrOutOfRange for us.
 
-	mappedPoint, err := curve.MapInverse(x+(curve.N>>1), y+(curve.N>>1))
+	curvePoint, err := curve.MapInverse(x+(curve.N>>1), y+(curve.N>>1))
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +72,24 @@ func GetIndexedPoint(x int, y int) ([]byte, error) {
 	// 798575177d078a16
 	// 26213f4c7d078a16
 	toReturn := make([]byte, 8)
-	binary.BigEndian.PutUint64(toReturn, uint64(mappedPoint))
+	binary.BigEndian.PutUint64(toReturn, uint64(curvePoint))
 	return toReturn, nil
+}
+
+// inverse of GetIndexedPoint. Return [x,y] position from an 8-byte spatial index key
+func GetPositionFromIndexedPoint(indexedPoint []byte) (int, int, error) {
+	if len(indexedPoint) < 8 {
+		return 0, 0, errors.New("GetPositionFromIndexedPoint requires at least 8 bytes")
+	}
+	curvePoint := int(binary.BigEndian.Uint64(indexedPoint[:8]))
+	curve := Hilbert{
+		N: 1 << getHilbertPlaneEdgeSizeBitsForCurrentProcessor(),
+	}
+	x, y, err := curve.Map(curvePoint)
+	if err != nil {
+		return 0, 0, err
+	}
+	return x - (curve.N >> 1), y - (curve.N >> 1), nil
 }
 
 // Use this with a range query on a database index.
