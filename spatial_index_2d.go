@@ -16,6 +16,9 @@ type SpatialIndex2D struct {
 	eightBytesToInt func([]byte) int
 }
 
+// This is the only way to create an instance of SpatialIndex2D. integerBits must be 32 or 64.
+// To use whatever processor you happen to be running on, like what golang itself does
+// with the `int` type, you may simply pass in `bits.UintSize`.
 func NewSpatialIndex2D(integerBits int) (*SpatialIndex2D, error) {
 	if integerBits > bits.UintSize {
 		return nil, fmt.Errorf("can't create a %d bit SpatialIndex2D on a %d bit CPU", integerBits, bits.UintSize)

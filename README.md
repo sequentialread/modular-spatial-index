@@ -27,21 +27,24 @@ If your database doesn't support arbitrary byte arrays as keys and values, you c
 ## Interface 
 
 ```
-// returns the minimum and maximum values for x and y coordinates passed into the index.
-// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
-func GetValidInputRange() (int, int) { ... }
+// This is the only way to create an instance of SpatialIndex2D. integerBits must be 32 or 64.
+// To use whatever processor you happen to be running on, like what golang itself does 
+// with the `int` type, you may simply pass in `bits.UintSize`.
+NewSpatialIndex2D(integerBits int) (*SpatialIndex2D, error) { ... }
 
-// returns two byte slices of length 8, one representing the smallest key in the index 
+// returns the minimum and maximum values for x and y coordinates passed into the index.
+(index *SpatialIndex2D) GetValidInputRange() (int, int) { ... }
+
+// returns two byte slices of length 8, one representing the smallest key in the index
 // and the other representing the largest possible key in the index
-// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
-func GetOutputRange() ([]byte, []byte) { ... }
+(index *SpatialIndex2D) GetOutputRange() ([]byte, []byte) { ... }
 
 // Returns a slice of 8 bytes which can be used as a key in a database index,
 // to be spatial-range-queried by RectangleToIndexedRanges
-func GetIndexedPoint(x int, y int) ([]byte, error) { ... }
+(index *SpatialIndex2D) GetIndexedPoint(x int, y int) ([]byte, error) { ... }
 
 // inverse of GetIndexedPoint. Return [x,y] position from an 8-byte spatial index key
-func GetPositionFromIndexedPoint(indexedPoint []byte) (int, int, error) { ... }
+(index *SpatialIndex2D) GetPositionFromIndexedPoint(indexedPoint []byte) (int, int, error) { ... }
 
 // Use this with a range query on a database index.
 type ByteRange struct {
@@ -58,9 +61,9 @@ type ByteRange struct {
 // iopsCostParam allows you to adjust a tradeoff between wasted I/O bandwidth and # of individual I/O operations.
 // I think 1.0 is actually a very reasonable value to use for SSD & HDD
 // (waste ~50% of bandwidth, save a lot of unneccessary I/O operations)
-// if you have an extremely fast NVME SSD with a good driver, you might try 0.5 or 0.1.
+// if you have an extremely fast NVME SSD with a good driver, you might try 0.5 or 0.1, but I doubt it will make it any faster.
 // 2 is probably way too much for any modern disk to benefit from, unless your data is VERY sparse
-func RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([]ByteRange, error) { ... }
+(index *SpatialIndex2D) RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([]ByteRange, error) { ... }
 
 ```
 
