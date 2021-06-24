@@ -72,6 +72,8 @@ func NewSpatialIndex2D(integerBits int) (*SpatialIndex2D, error) {
 }
 
 // returns the minimum and maximum values for x and y coordinates passed into the index.
+// 64-bit SpatialIndex2D: -1073741823, 1073741823
+// 32-bit SpatialIndex2D: -16383, 16383
 func (index *SpatialIndex2D) GetValidInputRange() (int, int) {
 	halfHilbertEdgeLength := 1 << (index.edgeSizeBits - 1)
 	return -halfHilbertEdgeLength + 1, halfHilbertEdgeLength - 1
@@ -79,6 +81,8 @@ func (index *SpatialIndex2D) GetValidInputRange() (int, int) {
 
 // returns two byte slices of length 8, one representing the smallest key in the index
 // and the other representing the largest possible key in the index
+// returns (as hex) 0000000000000000, 4000000000000000
+// 32 bit SpatialIndex2Ds always leave the last 4 bytes blank.
 func (index *SpatialIndex2D) GetOutputRange() ([]byte, []byte) {
 	return index.intToEightBytes(0), index.intToEightBytes(index.edgeLength * index.edgeLength)
 }
