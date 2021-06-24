@@ -3,93 +3,111 @@ package modularspatialindex
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/bits"
 	"sort"
 )
 
-// The edges of the hilbert curve plane must have a power-of-two size,
-// and for efficient arithmetic on the CPU, the length of the hilbert curve filling this plane
-// has to fit within the CPU architecture's `int` registers (32 bit versus 64 bit).
-//
-// As it is a space filling curve, length == area. So the length of the curve is equal to width*height.
-// therefore, the edge length of the plane should be the largest power of two less than
-//   - For 32 bit CPUs: sqrt(math.MaxInt32)
-//   - For 64 bit CPUs: sqrt(math.MaxInt64)
+type SpatialIndex2D struct {
+	hilbert
+	integerBits     int
+	edgeSizeBits    int
+	intToEightBytes func(int) []byte
+	eightBytesToInt func([]byte) int
+}
 
-// (because it's a square root, in general, it will have half as many bits.
-//  and since its the power of two which is LESS than the square root, it turns out to be half as many bits minus 1)
+func NewSpatialIndex2D(integerBits int) (*SpatialIndex2D, error) {
+	if integerBits > bits.UintSize {
+		return nil, fmt.Errorf("can't create a %d bit SpatialIndex2D on a %d bit CPU", integerBits, bits.UintSize)
+	}
+	if integerBits != 32 && integerBits != 64 {
+		return nil, fmt.Errorf("%d bit SpatialIndex2D is not supported, please use 32 or 64 bit", integerBits)
+	}
 
-func getHilbertPlaneEdgeSizeBitsForCurrentProcessor() int {
-	return (bits.UintSize / 2) - 1
+	// The edges of the hilbert curve plane must have a power-of-two size,
+	// and for efficient arithmetic on the CPU, the length of the hilbert curve filling this plane
+	// has to fit within the CPU architecture's `int` (32 bit versus 64 bit).
+	//
+	// As it is a space filling curve, length == area. So the length of the curve is equal to width*height.
+	// therefore, the edge length of the plane should be the largest power of two less than
+	//   - For 32 bit CPUs: sqrt(math.MaxInt32)
+	//   - For 64 bit CPUs: sqrt(math.MaxInt64)
+
+	// (because it's a square root, in general, it will have half as many bits.
+	//  and since 1 bit is used by the sign (-/+) of the number, its half minus 1
+	edgeSizeBits := (integerBits / 2) - 1
+
+	toReturn := &SpatialIndex2D{
+		hilbert: hilbert{
+			edgeLength: 1 << edgeSizeBits,
+		},
+		integerBits:  integerBits,
+		edgeSizeBits: edgeSizeBits,
+	}
+
+	if integerBits == 32 {
+		toReturn.intToEightBytes = func(v int) []byte {
+			eightBytes := make([]byte, 8)
+			binary.BigEndian.PutUint32(eightBytes, uint32(v))
+			return eightBytes
+		}
+		toReturn.eightBytesToInt = func(eightBytes []byte) int {
+			return int(binary.BigEndian.Uint32(eightBytes[:4]))
+		}
+	} else {
+		toReturn.intToEightBytes = func(v int) []byte {
+			eightBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(eightBytes, uint64(v))
+			return eightBytes
+		}
+		toReturn.eightBytesToInt = func(eightBytes []byte) int {
+			return int(binary.BigEndian.Uint64(eightBytes[:8]))
+		}
+	}
+
+	return toReturn, nil
 }
 
 // returns the minimum and maximum values for x and y coordinates passed into the index.
-// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
-func GetValidInputRange() (int, int) {
-	halfHilbertEdgeLength := 1 << (getHilbertPlaneEdgeSizeBitsForCurrentProcessor() - 1)
+func (index *SpatialIndex2D) GetValidInputRange() (int, int) {
+	halfHilbertEdgeLength := 1 << (index.edgeSizeBits - 1)
 	return -halfHilbertEdgeLength + 1, halfHilbertEdgeLength - 1
 }
 
 // returns two byte slices of length 8, one representing the smallest key in the index
 // and the other representing the largest possible key in the index
-// NOTE this depends on how many bits your integer has, so it will be different on 32 bit vs 64 bit systems.
-func GetOutputRange() ([]byte, []byte) {
-	min := make([]byte, 8)
-	binary.BigEndian.PutUint64(min, uint64(0))
-	hilbertPlaneEdgeLength := 1 << getHilbertPlaneEdgeSizeBitsForCurrentProcessor()
-	max := make([]byte, 8)
-	binary.BigEndian.PutUint64(max, uint64(hilbertPlaneEdgeLength*hilbertPlaneEdgeLength))
-	return min, max
+func (index *SpatialIndex2D) GetOutputRange() ([]byte, []byte) {
+	return index.intToEightBytes(0), index.intToEightBytes(index.edgeLength * index.edgeLength)
 }
 
 // Returns a slice of 8 bytes which can be used as a key in a database index,
 // to be spatial-range-queried by RectangleToIndexedRanges
-func GetIndexedPoint(x int, y int) ([]byte, error) {
-
-	curve := Hilbert{
-		N: 1 << getHilbertPlaneEdgeSizeBitsForCurrentProcessor(),
-	}
+func (index *SpatialIndex2D) GetIndexedPoint(x int, y int) ([]byte, error) {
 
 	// x and y can be negative, but the hilbert curve implementation is only defined over positive integers.
 	// so we have to attempt to transform x and y such that they are always positive.
-	// btw, `(index.N >> 1)` is just half of the edge length of the hilbert plane.
-	// so by adding (index.N >> 1) we are mapping from a -0.5..0.5 range to a 0..1 range.
-	// MapInverse will handle any out-of-bounds inputs & return ErrOutOfRange for us.
+	// btw, `(index.edgeLength >> 1)` is just half of the edge length of the hilbert plane.
+	// so by adding (index.edgeLength >> 1) we are mapping from a -50%..50% range to a 0%..100% range.
+	// pointToDistanceAlongCurve will handle any out-of-bounds inputs & return  an error for us.
 
-	curvePoint, err := curve.MapInverse(x+(curve.N>>1), y+(curve.N>>1))
+	curvePoint, err := index.pointToDistanceAlongCurve(x+(index.edgeLength>>1), y+(index.edgeLength>>1))
 	if err != nil {
 		return nil, err
 	}
 
-	// BigEndian puts the most significant bits first, so when the bits are used
-	// by the database engine for sorting, they will be sorted properly.
-	// For example, BigEndian looks like:
-	// 168a07830e039b46
-	// 168a0783b786e61d
-	// 168a0784033846da
-	// LittleEndian looks like:
-	// b93c2fc17c078a16
-	// 798575177d078a16
-	// 26213f4c7d078a16
-	toReturn := make([]byte, 8)
-	binary.BigEndian.PutUint64(toReturn, uint64(curvePoint))
-	return toReturn, nil
+	return index.intToEightBytes(curvePoint), nil
 }
 
 // inverse of GetIndexedPoint. Return [x,y] position from an 8-byte spatial index key
-func GetPositionFromIndexedPoint(indexedPoint []byte) (int, int, error) {
+func (index *SpatialIndex2D) GetPositionFromIndexedPoint(indexedPoint []byte) (int, int, error) {
 	if len(indexedPoint) < 8 {
 		return 0, 0, errors.New("GetPositionFromIndexedPoint requires at least 8 bytes")
 	}
-	curvePoint := int(binary.BigEndian.Uint64(indexedPoint[:8]))
-	curve := Hilbert{
-		N: 1 << getHilbertPlaneEdgeSizeBitsForCurrentProcessor(),
-	}
-	x, y, err := curve.Map(curvePoint)
+	x, y, err := index.distanceAlongCurveToPoint(index.eightBytesToInt(indexedPoint))
 	if err != nil {
 		return 0, 0, err
 	}
-	return x - (curve.N >> 1), y - (curve.N >> 1), nil
+	return x - (index.edgeLength >> 1), y - (index.edgeLength >> 1), nil
 }
 
 // Use this with a range query on a database index.
@@ -109,7 +127,7 @@ type ByteRange struct {
 // (waste ~50% of bandwidth, save a lot of unneccessary I/O operations)
 // if you have an extremely fast NVME SSD with a good driver, you might try 0.5 or 0.1, but I doubt it will make it any faster.
 // 2 is probably way too much for any modern disk to benefit from, unless your data is VERY sparse
-func RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([]ByteRange, error) {
+func (index *SpatialIndex2D) RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([]ByteRange, error) {
 
 	// scale the universe down (rounding in such a way that the original rectangle is never cropped)
 	// until we reach a scale where sampling the hilbert curve over the entire area of the query rectangle
@@ -147,8 +165,11 @@ func RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([
 		}
 		reducedBits++
 	}
+	if (index.edgeSizeBits - reducedBits) < 3 {
+		return nil, fmt.Errorf("RectangleToIndexedRanges(): %d by %d rectangle is too large, unable to downsample it to a reasonable size.", width, height)
+	}
 
-	reducedHilbertPlaneEdgeLength := 1 << (getHilbertPlaneEdgeSizeBitsForCurrentProcessor() - reducedBits)
+	reducedHilbertPlaneEdgeLength := 1 << (index.edgeSizeBits - reducedBits)
 
 	// I noticed that this method of reducing the detail is not always accurate.
 	// (small sections along the edge of the rectangle can be missed by rouding errors)
@@ -176,16 +197,16 @@ func RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([
 		}
 	}
 
-	curve := Hilbert{N: reducedHilbertPlaneEdgeLength}
+	downsampledCurve := hilbert{edgeLength: reducedHilbertPlaneEdgeLength}
 	curvePoints := make([]int, width*height)
 
 	for i := 0; i < width; i++ {
 		for j := 0; j < height; j++ {
-			p, err := curve.MapInverse(x+i+(curve.N>>1), y+j+(curve.N>>1))
+			d, err := downsampledCurve.pointToDistanceAlongCurve(x+i+(downsampledCurve.edgeLength>>1), y+j+(downsampledCurve.edgeLength>>1))
 			if err != nil {
 				return nil, err
 			}
-			curvePoints[j*width+i] = p
+			curvePoints[j*width+i] = d
 		}
 	}
 
@@ -214,15 +235,9 @@ func RectangleToIndexedRanges(x, y, width, height int, iopsCostParam float32) ([
 		startCurvePoint := (intRange[0] << (reducedBits * 2))
 		endCurvePoint := (intRange[1] << (reducedBits * 2))
 
-		startBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(startBytes, uint64(startCurvePoint))
-
-		endBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(endBytes, uint64(endCurvePoint))
-
 		byteRanges[i] = ByteRange{
-			Start: startBytes,
-			End:   endBytes,
+			Start: index.intToEightBytes(startCurvePoint),
+			End:   index.intToEightBytes(endCurvePoint),
 		}
 	}
 
