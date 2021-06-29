@@ -184,22 +184,22 @@ func (index *SpatialIndex2D) RectangleToIndexedRanges(x, y, width, height int, i
 	// which seemed to eliminate about 90% of the errors.
 	// The remaining errors I noticed were so minor I felt like I could ignore them.
 	if reducedBits > 0 {
-		if x > 0 {
+		if x > 1 {
 			x--
 		}
-		if y > 0 {
+		if y > 1 {
 			y--
 		}
-		if x+width < reducedHilbertPlaneEdgeLength {
+		if x+width+1 < reducedHilbertPlaneEdgeLength {
 			width++
 		}
-		if x+width < reducedHilbertPlaneEdgeLength {
+		if x+width+1 < reducedHilbertPlaneEdgeLength {
 			width++
 		}
-		if y+height < reducedHilbertPlaneEdgeLength {
+		if y+height+1 < reducedHilbertPlaneEdgeLength {
 			height++
 		}
-		if y+height < reducedHilbertPlaneEdgeLength {
+		if y+height+1 < reducedHilbertPlaneEdgeLength {
 			height++
 		}
 	}
