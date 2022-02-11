@@ -10,7 +10,9 @@ It's called "modular" because it doesn't have any indexing logic inside, you bri
 
 Read amplification for range queries is ~2x-3x in terms of IOPS and bandwidth compared to a 1-dimensional query.
 
-But that constant factor on top of your fast key/value database is a low price to pay for a whole new dimension, right? It's certainly better than the naive approach, especially if you might have wildly varying arbitrary query sizes, especially because with the spatial index, the IO bandwidth versus random read tradeoff is tune-able on a per-query basis without requiring the data to be re-indexed like an alternative approach might. 
+But that constant factor on top of your fast key/value database is a low price to pay for a whole new dimension, right? It's certainly better than the naive approach, especially if you might have wildly varying arbitrary query sizes.
+
+With the spatial index, the IO bandwidth versus random read tradeoff is tune-able on a per-query basis without requiring the data to be re-indexed. Alternative approaches like a "sliced" index can't do that. 
 
 See https://sequentialread.com/building-a-spatial-index-supporting-range-query-using-space-filling-hilbert-curve
 for more information.
